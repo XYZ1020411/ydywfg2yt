@@ -35,6 +35,18 @@
             font-size: 1rem;
             color: #555;
         }
+        .forecast {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .forecast-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
@@ -49,24 +61,36 @@
             <p id="alert" class="alert"></p>
             <div id="time" class="time"></div>
         </div>
+        <div id="forecast" class="forecast mx-auto">
+            <h3 class="text-center">7-Day Weather Forecast</h3>
+            <div id="weekly-forecast"></div>
+        </div>
     </div>
 
     <script>
-        const apiKey = 'd4f9c2080215f04dead4bbe068589ffc'; // Replace with your OpenWeatherMap API key
-        const apiUrl = `https://api.openweathermap.org/data/2.5/weather?q=Taipei&units=metric&appid=${apiKey}`;
+        const apiKey = 'e7c9c1cbab365f69f2b6727b47872e87'; // Replace with your OpenWeatherMap API key
 
-        async function fetchWeather() {
+        async function fetchWeather(lat, lon) {
             try {
-                const response = await fetch(apiUrl);
-                const data = await response.json();
+                const currentUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`;
+                const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast/daily?lat=${lat}&lon=${lon}&cnt=7&units=metric&appid=${apiKey}`;
 
-                const city = data.name;
-                const icon = `https://openweathermap.org/img/wn/${data.weather[0].icon}@2x.png`;
-                const description = data.weather[0].description;
-                const temp = `${data.main.temp}°C`;
-                const humidity = `Humidity: ${data.main.humidity}%`;
-                const alert = data.alerts ? data.alerts[0]?.description || 'No alerts' : 'No alerts';
-                const currentTime = new Date().toLocaleTimeString();
+                const [currentResponse, forecastResponse] = await Promise.all([
+                    fetch(currentUrl),
+                    fetch(forecastUrl)
+                ]);
+
+                const currentData = await currentResponse.json();
+                const forecastData = await forecastResponse.json();
+
+                const city = currentData.name;
+                const icon = `https://openweathermap.org/img/wn/${currentData.weather[0].icon}@2x.png`;
+                const description = currentData.weather[0].description;
+                const temp = `${currentData.main.temp}°C`;
+                const humidity = `Humidity: ${currentData.main.humidity}%`;
+                const alert = currentData.alerts ? currentData.alerts[0]?.description || 'No alerts' : 'No alerts';
+
+                const taiwanTime = new Date().toLocaleString('en-US', { timeZone: 'Asia/Taipei' });
 
                 document.getElementById('city').textContent = city;
                 document.getElementById('icon').src = icon;
@@ -74,14 +98,47 @@
                 document.getElementById('temperature').textContent = temp;
                 document.getElementById('humidity').textContent = humidity;
                 document.getElementById('alert').textContent = `Alert: ${alert}`;
-                document.getElementById('time').textContent = `Last updated: ${currentTime}`;
+                document.getElementById('time').textContent = `Last updated: ${taiwanTime}`;
+
+                const forecastContainer = document.getElementById('weekly-forecast');
+                forecastContainer.innerHTML = '';
+
+                forecastData.list.forEach(day => {
+                    const date = new Date(day.dt * 1000).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Taipei' });
+                    const dayTemp = `${day.temp.day}°C`;
+                    const dayIcon = `https://openweathermap.org/img/wn/${day.weather[0].icon}@2x.png`;
+                    const item = `
+                        <div class="forecast-item">
+                            <span>${date}</span>
+                            <img src="${dayIcon}" alt="icon" width="30">
+                            <span>${dayTemp}</span>
+                        </div>
+                    `;
+                    forecastContainer.innerHTML += item;
+                });
+
             } catch (error) {
                 console.error('Error fetching weather data:', error);
                 document.getElementById('city').textContent = 'Error loading weather data';
             }
         }
 
-        fetchWeather();
+        function getLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    const { latitude, longitude } = position.coords;
+                    fetchWeather(latitude, longitude);
+                }, () => {
+                    alert('Location access denied. Defaulting to Taipei.');
+                    fetchWeather(25.033, 121.5654); // Default to Taipei
+                });
+            } else {
+                alert('Geolocation not supported. Defaulting to Taipei.');
+                fetchWeather(25.033, 121.5654); // Default to Taipei
+            }
+        }
+
+        getLocation();
     </script>
 </body>
 </html>
